@@ -1,0 +1,5 @@
+<resources>
+    <string name="suite_clear_text">Clear text</string>
+    <string name="suite_web_back">Go back</string>
+    <string name="suite_web_invalid_url">This link cannot be opened.</string>
+</resources>
