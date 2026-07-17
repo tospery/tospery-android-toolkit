@@ -1,0 +1,148 @@
+package com.tospery.net.retrofit
+
+import com.tospery.base.logging.LogTags
+import com.tospery.base.logging.error
+import com.tospery.base.logging.info
+import com.tospery.base.logging.warning
+import com.tospery.buildmetadata.module_net_retrofit.ModuleMetadata
+import java.io.IOException
+import okhttp3.Headers
+import okhttp3.HttpUrl
+import okhttp3.Interceptor
+import okhttp3.RequestBody
+import okhttp3.Response
+import okio.Buffer
+
+internal val NET_LOG_TAG = LogTags.moduleTag(ModuleMetadata.path)
+
+/**
+ * 使用 base 日志抽象记录网络请求生命周期。
+ *
+ * 日志会打印请求和响应摘要，但会脱敏 Authorization、PAT、OAuth code、
+ * code_verifier、access token 等敏感信息。
+ */
+internal class AppLoggerInterceptor(
+    private val tag: String = NET_LOG_TAG,
+    private val redactSensitiveData: Boolean = true,
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val url = request.url.toLogUrl()
+
+        info(tag = tag) { "[${request.method}]$url" }
+        info(tag = tag) { request.body.redactedForLog(request.headers) }
+
+        return try {
+            val response = chain.proceed(request)
+            val responseBody = response.responseBodyForLog()
+
+            if (response.isSuccessful) {
+                info(tag = tag) { "[${response.code}]$url" }
+                info(tag = tag) { responseBody }
+            } else {
+                warning(tag = tag) { "[${response.code}]$url" }
+                warning(tag = tag) { responseBody }
+            }
+
+            response
+        } catch (throwable: IOException) {
+            error(
+                tag = tag,
+                throwable = throwable,
+            ) {
+                buildString {
+                    append("[异常]")
+                    append(url)
+                    append(" ")
+                    append(throwable.javaClass.simpleName)
+                }.trimEnd()
+            }
+            throw throwable
+        }
+    }
+
+    private fun RequestBody?.redactedForLog(headers: Headers): String {
+        if (this == null) return EMPTY_LOG_VALUE
+        if (isDuplex() || isOneShot()) return UNREADABLE_LOG_VALUE
+        if (!headers.isPlainTextBody()) return UNREADABLE_LOG_VALUE
+
+        return runCatching {
+            Buffer().use { buffer ->
+                writeTo(buffer)
+                buffer.readString(contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8)
+            }
+        }.getOrDefault(UNREADABLE_LOG_VALUE)
+            .truncateForLog()
+            .redactSensitiveText()
+    }
+
+    private fun Response.responseBodyForLog(): String {
+        if (!headers.isPlainTextBody()) return UNREADABLE_LOG_VALUE
+
+        return runCatching {
+            peekBody(MAX_BODY_LOG_BYTES).string()
+        }.getOrDefault(UNREADABLE_LOG_VALUE)
+            .truncateForLog()
+            .redactSensitiveText()
+    }
+
+    private fun HttpUrl.toLogUrl(): String {
+        return if (redactSensitiveData) {
+            newBuilder()
+                .query(null)
+                .fragment(null)
+                .build()
+                .toString()
+        } else {
+            toString()
+        }
+    }
+
+    private fun Headers.isPlainTextBody(): Boolean {
+        val contentEncoding = this["Content-Encoding"]
+        if (!contentEncoding.isNullOrBlank() && !contentEncoding.equals("identity", true)) {
+            return false
+        }
+
+        val contentType = this["Content-Type"] ?: return true
+        return PLAIN_TEXT_CONTENT_TYPES.any { contentType.contains(it, ignoreCase = true) }
+    }
+
+    private fun String.redactSensitiveText(): String {
+        if (!redactSensitiveData) return this
+
+        return SENSITIVE_JSON_FIELD_REGEX.replace(this) { matchResult ->
+            "${matchResult.groupValues[1]}$REDACTED_VALUE${matchResult.groupValues[3]}"
+        }
+    }
+
+    private fun String.truncateForLog(): String {
+        return if (length <= MAX_BODY_LOG_CHARS) {
+            this.ifBlank { EMPTY_LOG_VALUE }
+        } else {
+            take(MAX_BODY_LOG_CHARS) + "\n...<已截断>"
+        }
+    }
+
+    private companion object {
+        const val MAX_BODY_LOG_BYTES = 16_384L
+        const val MAX_BODY_LOG_CHARS = 16_384
+        const val EMPTY_LOG_VALUE = "<空>"
+        const val UNREADABLE_LOG_VALUE = "<不可读取>"
+        const val REDACTED_VALUE = "***"
+
+        val PLAIN_TEXT_CONTENT_TYPES = setOf(
+            "text/",
+            "json",
+            "xml",
+            "html",
+            "x-www-form-urlencoded",
+        )
+
+        val SENSITIVE_JSON_FIELD_REGEX = Regex(
+            pattern = "(?i)(\"(?:githubAccessToken|githubOAuthCode|githubOAuthCodeVerifier|" +
+                "access_token|refresh_token|id_token|token|code_verifier|client_secret|" +
+                "clientSecret|password)\"\\s*:\\s*\")([^\"]*)(\")",
+        )
+    }
+}

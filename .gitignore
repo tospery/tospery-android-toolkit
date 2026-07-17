@@ -25,3 +25,34 @@ replay_pid*
 
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
+# Tospery Android Toolkit generated files
+
+# Gradle 与 Kotlin 构建缓存、所有模块的 build 目录。
+.gradle/
+.kotlin/
+build/
+out/
+
+# Android 本地环境与原生构建输出。
+local.properties
+.externalNativeBuild/
+.cxx/
+captures/
+
+# Android Studio 与 IntelliJ IDEA 本地文件。
+.idea/
+*.iml
+
+# macOS 与日志文件。
+.DS_Store
+*.log
+
+# 本地签名文件和私钥文件。
+*.jks
+*.keystore
+*.p12
+*.pem
+secring.gpg
+
+# Gradle Wrapper JAR 是可复现构建的必要文件，必须提交。
+!gradle/wrapper/gradle-wrapper.jar
