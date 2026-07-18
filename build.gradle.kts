@@ -1,12 +1,21 @@
+import com.android.build.api.attributes.AgpVersionAttr
+import com.android.build.api.attributes.BuildTypeAttr
 import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import org.gradle.api.DefaultTask
+import org.gradle.api.attributes.Bundling
+import org.gradle.api.attributes.Category
+import org.gradle.api.attributes.LibraryElements
+import org.gradle.api.attributes.Usage
+import org.gradle.api.attributes.java.TargetJvmEnvironment
+import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
     // 在根工程统一加载插件，子模块应用时不再重复加载 Kotlin 插件。
@@ -180,8 +189,178 @@ subprojects {
     val publicationMetadata =
         toolkitPublicationModules[path] ?: return@subprojects
 
-    group = toolkitGroupId
+    // 嵌套 model/core 与根 core 的叶子名称相同，需要使用唯一的本地组件 group。
+    // Maven 发布仍由 coordinates() 固定为 com.tospery:github-model-core。
+    val compositeProjectGroup =
+        if (path == ":github:model:core") {
+            "$toolkitGroupId.github.model"
+        } else {
+            toolkitGroupId
+        }
+
+    group = compositeProjectGroup
     version = toolkitVersion
+
+    // Maven 变体使用实际发布 artifactId；Composite 变体保留本地项目身份。
+    val publicationCapability =
+        listOf(
+            toolkitGroupId,
+            publicationMetadata.artifactId,
+            toolkitVersion,
+        ).joinToString(":")
+    val projectCapability =
+        listOf(
+            compositeProjectGroup,
+            project.name,
+            toolkitVersion,
+        ).joinToString(":")
+    // 为纯 JVM 模块的公开 API 和运行时变体声明发布 capability。
+    plugins.withId("java-library") {
+        val apiElements = configurations.named("apiElements")
+        val runtimeElements = configurations.named("runtimeElements")
+
+        listOf(apiElements, runtimeElements).forEach { configuration ->
+            configuration.configure {
+                outgoing.capability(publicationCapability)
+            }
+        }
+
+        // artifactId 与本地项目身份不一致时，为纯 JVM 项目依赖保留独立变体。
+        // 该变体不加入 Java Component，因此不会进入 Maven Module Metadata。
+        if (projectCapability != publicationCapability) {
+            listOf(
+                Triple("compositeApiElements", apiElements, Usage.JAVA_API),
+                Triple(
+                    "compositeRuntimeElements",
+                    runtimeElements,
+                    Usage.JAVA_RUNTIME,
+                ),
+            ).forEach { (configurationName, sourceElements, usageName) ->
+                configurations.create(configurationName) {
+                    isCanBeConsumed = true
+                    isCanBeResolved = false
+                    extendsFrom(*sourceElements.get().extendsFrom.toTypedArray())
+
+                    attributes {
+                        attribute(
+                            Category.CATEGORY_ATTRIBUTE,
+                            objects.named(Category::class.java, Category.LIBRARY),
+                        )
+                        attribute(
+                            Bundling.BUNDLING_ATTRIBUTE,
+                            objects.named(Bundling::class.java, Bundling.EXTERNAL),
+                        )
+                        attribute(
+                            LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+                            objects.named(
+                                LibraryElements::class.java,
+                                LibraryElements.JAR,
+                            ),
+                        )
+                        attribute(
+                            Usage.USAGE_ATTRIBUTE,
+                            objects.named(Usage::class.java, usageName),
+                        )
+                        attribute(
+                            TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE,
+                            objects.named(
+                                TargetJvmEnvironment::class.java,
+                                TargetJvmEnvironment.STANDARD_JVM,
+                            ),
+                        )
+                        attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 11)
+                        attribute(
+                            KotlinPlatformType.attribute,
+                            KotlinPlatformType.jvm,
+                        )
+                    }
+
+                    outgoing.artifact(tasks.named("jar"))
+                    outgoing.capability(projectCapability)
+                }
+            }
+        }
+
+        // Maven JAR 没有 Kotlin 平台属性，而 Composite Build 会直接选择项目变体。
+        // 额外提供 androidJvm 兼容变体，使 Android 模块能够消费纯 JVM Toolkit 模块。
+        listOf("debug", "release").forEach { buildType ->
+            listOf(
+                Triple("ApiElements", apiElements, Usage.JAVA_API),
+                Triple("RuntimeElements", runtimeElements, Usage.JAVA_RUNTIME),
+            ).forEach { (configurationSuffix, sourceElements, usageName) ->
+                val capitalizedBuildType =
+                    buildType.replaceFirstChar { it.uppercaseChar() }
+
+                configurations.create(
+                    "android$capitalizedBuildType$configurationSuffix",
+                ) {
+                    isCanBeConsumed = true
+                    isCanBeResolved = false
+                    extendsFrom(*sourceElements.get().extendsFrom.toTypedArray())
+
+                    attributes {
+                        attribute(
+                            Category.CATEGORY_ATTRIBUTE,
+                            objects.named(Category::class.java, Category.LIBRARY),
+                        )
+                        attribute(
+                            Bundling.BUNDLING_ATTRIBUTE,
+                            objects.named(Bundling::class.java, Bundling.EXTERNAL),
+                        )
+                        attribute(
+                            LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+                            objects.named(
+                                LibraryElements::class.java,
+                                LibraryElements.JAR,
+                            ),
+                        )
+                        attribute(
+                            Usage.USAGE_ATTRIBUTE,
+                            objects.named(Usage::class.java, usageName),
+                        )
+                        attribute(
+                            TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE,
+                            objects.named(
+                                TargetJvmEnvironment::class.java,
+                                TargetJvmEnvironment.ANDROID,
+                            ),
+                        )
+                        attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 11)
+                        attribute(
+                            KotlinPlatformType.attribute,
+                            KotlinPlatformType.androidJvm,
+                        )
+                        attribute(
+                            AgpVersionAttr.ATTRIBUTE,
+                            objects.named(
+                                AgpVersionAttr::class.java,
+                                libs.versions.agp.get(),
+                            ),
+                        )
+                        attribute(
+                            BuildTypeAttr.ATTRIBUTE,
+                            objects.named(BuildTypeAttr::class.java, buildType),
+                        )
+                    }
+
+                    outgoing.artifact(tasks.named("jar"))
+                    outgoing.capability(projectCapability)
+                }
+            }
+        }
+    }
+
+    // 为 Android Library 的 debug/release API 和运行时变体声明发布 capability。
+    plugins.withId("com.android.library") {
+        configurations.configureEach {
+            if (
+                name.endsWith("ApiElements") ||
+                name.endsWith("RuntimeElements")
+            ) {
+                outgoing.capability(publicationCapability)
+            }
+        }
+    }
 
     apply(plugin = "com.vanniktech.maven.publish")
 
