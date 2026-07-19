@@ -27,6 +27,15 @@ class JsoupGitHubTrendingParserTest {
                   <span itemprop="programmingLanguage">Kotlin</span>
                   <a href="/owner/repo/stargazers">1,234</a>
                   <a href="/owner/repo/forks">56</a>
+                  <span class="d-inline-block mr-3">
+                    Built by
+                    <a href="/octocat">
+                      <img src="/avatars/u/1?v=4" alt="@octocat" />
+                    </a>
+                    <a href="/hubot">
+                      <img src="https://avatars.githubusercontent.com/u/2?v=4" alt="@hubot" />
+                    </a>
+                  </span>
                   <span class="float-sm-right">78 stars today</span>
                 </article>
               </body>
@@ -60,6 +69,17 @@ class JsoupGitHubTrendingParserTest {
             result.repositories,
         )
         assertEquals(mapOf(repoId to 78), result.starsInPeriodByRepoId)
+        assertEquals(
+            listOf("octocat", "hubot"),
+            result.builtByUsersByRepoId[repoId]?.map(User::login),
+        )
+        assertEquals(
+            listOf(
+                "https://github.com/avatars/u/1?v=4",
+                "https://avatars.githubusercontent.com/u/2?v=4",
+            ),
+            result.builtByUsersByRepoId[repoId]?.map(User::avatarUrl),
+        )
     }
 
     @Test

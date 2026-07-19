@@ -17,6 +17,7 @@ class JsoupGitHubTrendingParser : GitHubTrendingParser {
         val document = Jsoup.parse(html, GITHUB_BASE_URL)
         val repositories = mutableListOf<Repo>()
         val starsInPeriodByRepoId = linkedMapOf<RepoId, Int>()
+        val builtByUsersByRepoId = linkedMapOf<RepoId, List<User>>()
 
         document.select("article.Box-row").forEach { article ->
             val repository = article.parseRepository() ?: return@forEach
@@ -24,11 +25,16 @@ class JsoupGitHubTrendingParser : GitHubTrendingParser {
             article.parseStarsInPeriod()?.let { starsInPeriod ->
                 starsInPeriodByRepoId[repository.id] = starsInPeriod
             }
+            val builtByUsers = article.parseBuiltByUsers()
+            if (builtByUsers.isNotEmpty()) {
+                builtByUsersByRepoId[repository.id] = builtByUsers
+            }
         }
 
         return GitHubTrendingRepositories(
             repositories = repositories,
             starsInPeriodByRepoId = starsInPeriodByRepoId,
+            builtByUsersByRepoId = builtByUsersByRepoId,
         )
     }
 
@@ -163,6 +169,43 @@ class JsoupGitHubTrendingParser : GitHubTrendingParser {
             .firstOrNull()
     }
 
+    private fun Element.parseBuiltByUsers(): List<User> {
+        val builtByContainer =
+            select("span")
+                .firstOrNull { span ->
+                    span.ownText().contains(BUILT_BY_LABEL, ignoreCase = true) &&
+                        span.selectFirst("a[href] img") != null
+                }
+                ?: return emptyList()
+
+        return builtByContainer
+            .select("a[href]")
+            .mapNotNull { link ->
+                val username = link.userLoginOrNull() ?: return@mapNotNull null
+                val avatarUrl =
+                    link.selectFirst("img")
+                        ?.absUrl("src")
+                        ?.takeIf(String::isNotBlank)
+
+                User(
+                    id = UserId("trending:$username"),
+                    githubId = null,
+                    login = username,
+                    name = null,
+                    avatarUrl = avatarUrl,
+                    htmlUrl =
+                        link.absUrl("href").takeIf(String::isNotBlank)
+                            ?: "$GITHUB_BASE_URL/$username",
+                    bio = null,
+                    company = null,
+                    location = null,
+                    blog = null,
+                    followersCount = null,
+                    followingCount = null,
+                )
+            }.distinctBy(User::login)
+    }
+
     private fun Element.userLoginOrNull(): String? {
         val path = attr("href").substringBefore('?').trim('/')
         return path.takeIf { it.isNotBlank() && '/' !in it }
@@ -208,6 +251,7 @@ class JsoupGitHubTrendingParser : GitHubTrendingParser {
 
     private companion object {
         const val GITHUB_BASE_URL = "https://github.com"
+        const val BUILT_BY_LABEL = "Built by"
         val STARS_IN_PERIOD_REGEX =
             Regex(
                 pattern = "([\\d,]+(?:\\.\\d+)?[kKmM]?)\\s+stars?\\s+(?:today|this\\s+week|this\\s+month)",
