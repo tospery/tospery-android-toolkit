@@ -168,6 +168,12 @@ val toolkitPublicationModules = mapOf(
         description =
             "Reusable Android app utilities and Compose components.",
     ),
+    ":suite-nav-compose" to MavenModuleMetadata(
+        artifactId = "suite-nav-compose",
+        displayName = "Tospery Suite Navigation Compose",
+        description =
+            "Jetpack Navigation Compose adapter for Tospery Navigation.",
+    ),
     ":github:model:core" to MavenModuleMetadata(
         artifactId = "github-model-core",
         displayName = "Tospery GitHub Model Core",

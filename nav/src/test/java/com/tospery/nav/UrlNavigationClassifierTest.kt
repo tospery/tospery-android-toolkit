@@ -23,6 +23,27 @@ class UrlNavigationClassifierTest {
     }
 
     @Test
+    fun customSchemeOverlayPreservesEncodedRouteArguments() {
+        val overlay =
+            NavOverlayRoute.Predefined(
+                presentation = NavPresentation.DIALOG,
+                id = NavOverlayId("clearcache"),
+            )
+
+        val target =
+            classifier.classify(
+                overlay.toUri(UrlScheme("higit")),
+            )
+
+        assertEquals(
+            UrlNavigationTarget.InternalRoute(
+                NavRoute("dialog?id=clearcache"),
+            ),
+            target,
+        )
+    }
+
+    @Test
     fun appLinkUsesPathAsInternalRoutePath() {
         val target = classifier.classify("https://higit.com/about")
 

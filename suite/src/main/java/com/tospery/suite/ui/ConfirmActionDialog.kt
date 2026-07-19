@@ -54,74 +54,100 @@ fun ConfirmActionDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                // 操作按钮按对话框宽度计算，避免文案长度改变视觉重心。
-                val actionWidth = maxWidth / 3
+        ConfirmActionDialogContent(
+            title = title,
+            message = message,
+            confirmText = confirmText,
+            dismissText = dismissText,
+            onConfirm = onConfirm,
+            onDismiss = onDismiss,
+            confirmActionStyle = confirmActionStyle,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+    }
+}
 
-                Column(
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
+/**
+ * 确认弹窗的纯内容，可由 Navigation Compose 的 Dialog destination 直接承载。
+ */
+@Composable
+fun ConfirmActionDialogContent(
+    title: String,
+    message: String?,
+    confirmText: String,
+    dismissText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    confirmActionStyle: ConfirmActionStyle = ConfirmActionStyle.PRIMARY,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 6.dp,
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            // 操作按钮按对话框宽度计算，避免文案长度改变视觉重心。
+            val actionWidth = maxWidth / 3
+
+            Column(
+                modifier = Modifier.padding(horizontal = 28.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+
+                message?.let {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = title,
+                        text = it,
                         modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
+                }
 
-                    message?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(28.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.width(actionWidth),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
                         Text(
-                            text = it,
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = dismissText,
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.width(actionWidth),
+                        shape = RoundedCornerShape(14.dp),
+                        colors =
+                            when (confirmActionStyle) {
+                                ConfirmActionStyle.PRIMARY -> ButtonDefaults.buttonColors()
+                                ConfirmActionStyle.DESTRUCTIVE ->
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError,
+                                    )
+                            },
                     ) {
-                        OutlinedButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.width(actionWidth),
-                            shape = RoundedCornerShape(14.dp),
-                        ) {
-                            Text(
-                                text = dismissText,
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
-                        Button(
-                            onClick = onConfirm,
-                            modifier = Modifier.width(actionWidth),
-                            shape = RoundedCornerShape(14.dp),
-                            colors =
-                                when (confirmActionStyle) {
-                                    ConfirmActionStyle.PRIMARY -> ButtonDefaults.buttonColors()
-                                    ConfirmActionStyle.DESTRUCTIVE ->
-                                        ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.error,
-                                            contentColor = MaterialTheme.colorScheme.onError,
-                                        )
-                                },
-                        ) {
-                            Text(
-                                text = confirmText,
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
+                        Text(
+                            text = confirmText,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
                 }
             }

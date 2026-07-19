@@ -14,5 +14,7 @@ kotlin {
 dependencies {
     api(project(":base"))
 
+    implementation(libs.moshi)
+
     testImplementation(libs.junit)
 }

@@ -7,6 +7,18 @@ enum class ForwardMode {
     SINGLE_TOP,
 }
 
+/**
+ * 内部路由在 Android UI 中的呈现方式。
+ *
+ * Dialog 与 Sheet 仍是可进入返回栈的页面级目标；Toast、Snackbar、tips 等瞬时反馈
+ * 不属于路由目标，应由各端的 UI effect 系统处理。
+ */
+enum class NavPresentation {
+    SCREEN,
+    DIALOG,
+    SHEET,
+}
+
 enum class BackMode {
     AUTO,
     POP_ONE,
@@ -15,11 +27,6 @@ enum class BackMode {
 }
 
 enum class OpenMode {
-    TOAST,
-    ALERT,
-    SHEET,
-    POPUP,
-    LOGIC,
     EXTERNAL_APP,
     SYSTEM_URI,
     WEB,
@@ -29,6 +36,7 @@ sealed interface NavAction {
     data class Forward(
         val route: NavRoute,
         val mode: ForwardMode = ForwardMode.PUSH,
+        val presentation: NavPresentation = NavPresentation.SCREEN,
     ) : NavAction
 
     data class Back(

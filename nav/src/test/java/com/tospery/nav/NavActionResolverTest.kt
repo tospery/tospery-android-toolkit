@@ -15,6 +15,13 @@ class NavActionResolverTest {
                     id = NavRouteId("profile"),
                     requiresAuth = true,
                 ),
+                navOverlayRouteDefinition(
+                    presentation = NavPresentation.DIALOG,
+                    requiresAuth = true,
+                ),
+                navOverlayRouteDefinition(
+                    presentation = NavPresentation.SHEET,
+                ),
             ),
         ),
     )
@@ -68,6 +75,76 @@ class NavActionResolverTest {
             NavAction.Forward(route = NavRoute("profile")),
             action,
         )
+    }
+
+    @Test
+    fun predefinedDialogResolvesToPresentedDialogAction() {
+        val route =
+            NavOverlayRoute.Predefined(
+                presentation = NavPresentation.DIALOG,
+                id = NavOverlayId("clearcache"),
+            ).toNavRoute()
+
+        val action =
+            resolver.resolve(
+                target = UrlNavigationTarget.InternalRoute(route),
+                isAuthenticated = true,
+            )
+
+        assertEquals(
+            NavAction.Forward(
+                route = route,
+                mode = ForwardMode.PRESENT,
+                presentation = NavPresentation.DIALOG,
+            ),
+            action,
+        )
+    }
+
+    @Test
+    fun generatedSheetResolvesToPresentedSheetAction() {
+        val route =
+            NavOverlayRoute.Generated(
+                presentation = NavPresentation.SHEET,
+                title = "Choose",
+                actions =
+                    listOf(
+                        NavOverlayAction(
+                            id = NavOverlayActionId("close"),
+                            type = NavOverlayActionType.DISMISS,
+                            title = "Close",
+                        ),
+                    ),
+            ).toNavRoute()
+
+        val action =
+            resolver.resolve(
+                target = UrlNavigationTarget.InternalRoute(route),
+                isAuthenticated = false,
+            )
+
+        assertEquals(
+            NavAction.Forward(
+                route = route,
+                mode = ForwardMode.PRESENT,
+                presentation = NavPresentation.SHEET,
+            ),
+            action,
+        )
+    }
+
+    @Test
+    fun malformedDialogArgumentsResolveToInvalidAction() {
+        val action =
+            resolver.resolve(
+                target =
+                    UrlNavigationTarget.InternalRoute(
+                        NavRoute("dialog?title=MissingActions"),
+                    ),
+                isAuthenticated = true,
+            )
+
+        assertTrue(action is NavAction.Invalid)
     }
 
     @Test

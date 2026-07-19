@@ -36,7 +36,10 @@ class NavRouteBuilder(
     }
 
     private fun String.encodeUrl(): String {
-        return URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+        // URLEncoder 使用表单编码并把空格写成 +，Navigation Compose 不会将其还原。
+        return URLEncoder
+            .encode(this, StandardCharsets.UTF_8.name())
+            .replace("+", "%20")
     }
 }
 

@@ -46,9 +46,17 @@ class NavActionResolver(
                 source = route.value,
             )
 
+        if (!definition.presentation.accepts(parsedRoute)) {
+            return NavAction.Invalid(
+                reason = "Route arguments do not match its presentation.",
+                source = route.value,
+            )
+        }
+
         val action = NavAction.Forward(
             route = route,
             mode = definition.defaultForwardMode,
+            presentation = definition.presentation,
         )
 
         return if (definition.requiresAuth && !isAuthenticated) {
@@ -56,5 +64,15 @@ class NavActionResolver(
         } else {
             action
         }
+    }
+}
+
+private fun NavPresentation.accepts(route: ParsedNavRoute): Boolean {
+    return when (this) {
+        NavPresentation.SCREEN -> true
+        NavPresentation.DIALOG ->
+            NavOverlayRoute.parseOrNull(route)?.presentation == NavPresentation.DIALOG
+        NavPresentation.SHEET ->
+            NavOverlayRoute.parseOrNull(route)?.presentation == NavPresentation.SHEET
     }
 }

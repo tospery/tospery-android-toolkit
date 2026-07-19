@@ -15,10 +15,16 @@ data class NavRouteDefinition(
     val id: NavRouteId,
     val path: String = id.value,
     val requiresAuth: Boolean = false,
-    val defaultForwardMode: ForwardMode = ForwardMode.PUSH,
+    val presentation: NavPresentation = NavPresentation.SCREEN,
+    val defaultForwardMode: ForwardMode = presentation.defaultForwardMode,
 ) {
     init {
         require(path.isNotBlank()) { "NavRouteDefinition path must not be blank." }
+        if (presentation != NavPresentation.SCREEN) {
+            require(defaultForwardMode == ForwardMode.PRESENT) {
+                "Dialog and sheet routes must use ForwardMode.PRESENT."
+            }
+        }
     }
 }
 
@@ -50,3 +56,12 @@ class NavRouteTable(
         return trim().trim('/')
     }
 }
+
+private val NavPresentation.defaultForwardMode: ForwardMode
+    get() =
+        when (this) {
+            NavPresentation.SCREEN -> ForwardMode.PUSH
+            NavPresentation.DIALOG,
+            NavPresentation.SHEET,
+            -> ForwardMode.PRESENT
+        }
