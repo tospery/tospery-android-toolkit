@@ -14,6 +14,7 @@ kotlin {
 dependencies {
     api(project(":github:model:core"))
     implementation(libs.jsoup)
+    implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }
