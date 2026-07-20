@@ -40,11 +40,12 @@ class NavActionResolver(
         isAuthenticated: Boolean,
     ): NavAction {
         val parsedRoute = route.parse()
-        val definition = routeTable.findByPath(parsedRoute.path)
+        val match = routeTable.match(parsedRoute)
             ?: return NavAction.Invalid(
                 reason = "Route is not registered.",
                 source = route.value,
             )
+        val definition = match.definition
 
         if (!definition.presentation.accepts(parsedRoute)) {
             return NavAction.Invalid(
@@ -55,6 +56,7 @@ class NavActionResolver(
 
         val action = NavAction.Forward(
             route = route,
+            pathParameters = match.pathParameters,
             mode = definition.defaultForwardMode,
             presentation = definition.presentation,
         )

@@ -15,6 +15,14 @@ class NavActionResolverTest {
                     id = NavRouteId("profile"),
                     requiresAuth = true,
                 ),
+                NavRouteDefinition(
+                    id = NavRouteId("repository"),
+                    path = "{owner}/{repo}",
+                ),
+                NavRouteDefinition(
+                    id = NavRouteId("account"),
+                    path = "{login}",
+                ),
                 navOverlayRouteDefinition(
                     presentation = NavPresentation.DIALOG,
                     requiresAuth = true,
@@ -40,13 +48,59 @@ class NavActionResolverTest {
     }
 
     @Test
+    fun dynamicRepositoryRouteProvidesPathParameters() {
+        val route = NavRoute("devxoul/ReactorKit")
+
+        val action =
+            resolver.resolve(
+                target = UrlNavigationTarget.InternalRoute(route),
+                isAuthenticated = true,
+            )
+
+        assertEquals(
+            NavAction.Forward(
+                route = route,
+                pathParameters =
+                    mapOf(
+                        "owner" to "devxoul",
+                        "repo" to "ReactorKit",
+                    ),
+            ),
+            action,
+        )
+    }
+
+    @Test
     fun unregisteredInternalRouteResolvesToInvalidAction() {
         val action = resolver.resolve(
-            target = UrlNavigationTarget.InternalRoute(NavRoute("missing")),
+            target =
+                UrlNavigationTarget.InternalRoute(
+                    NavRoute("missing/too/many"),
+                ),
             isAuthenticated = true,
         )
 
         assertTrue(action is NavAction.Invalid)
+    }
+
+    @Test
+    fun dialogWithoutArgumentsResolvesAsAccountRoute() {
+        val route = NavRoute("dialog")
+
+        val action =
+            resolver.resolve(
+                target = UrlNavigationTarget.InternalRoute(route),
+                isAuthenticated = true,
+            )
+
+        assertEquals(
+            NavAction.Forward(
+                route = route,
+                pathParameters =
+                    mapOf("login" to "dialog"),
+            ),
+            action,
+        )
     }
 
     @Test

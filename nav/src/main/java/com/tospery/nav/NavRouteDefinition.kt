@@ -14,6 +14,7 @@ value class NavRouteId(
 data class NavRouteDefinition(
     val id: NavRouteId,
     val path: String = id.value,
+    val queryDiscriminator: NavRouteQueryDiscriminator? = null,
     val requiresAuth: Boolean = false,
     val presentation: NavPresentation = NavPresentation.SCREEN,
     val defaultForwardMode: ForwardMode = presentation.defaultForwardMode,
@@ -31,31 +32,201 @@ data class NavRouteDefinition(
 class NavRouteTable(
     definitions: Collection<NavRouteDefinition>,
 ) {
-    private val definitionsByPath = definitions.associateBy {
-        it.normalizedPath
-    }
+    private val registeredRoutes: List<RegisteredNavRoute>
 
     init {
-        require(definitionsByPath.size == definitions.size) {
-            "NavRouteTable contains duplicated route paths."
+        val compiledRoutes =
+            definitions.map { definition ->
+                RegisteredNavRoute(
+                    definition = definition,
+                    pattern = compileNavRoutePattern(definition.path),
+                )
+            }
+
+        validateNoAmbiguousPatterns(compiledRoutes)
+
+        registeredRoutes =
+            compiledRoutes.sortedWith(
+                compareByDescending<RegisteredNavRoute> {
+                    it.pattern.literalSegmentCount
+                }.thenByDescending {
+                    it.pattern.segments.size
+                },
+            )
+    }
+
+    fun match(path: String): NavRouteMatch? {
+        return match(ParsedNavRoute(path = path))
+    }
+
+    fun match(route: ParsedNavRoute): NavRouteMatch? {
+        val pathSegments = parseRoutePathSegments(route.path) ?: return null
+
+        return registeredRoutes.firstNotNullOfOrNull { registeredRoute ->
+            val definition = registeredRoute.definition
+
+            if (!definition.acceptsQueryParameters(route.queryParameters)) {
+                null
+            } else {
+                registeredRoute.pattern
+                    .match(pathSegments)
+                    ?.let { pathParameters ->
+                        NavRouteMatch(
+                            definition = definition,
+                            pathParameters = pathParameters,
+                        )
+                    }
+            }
         }
     }
 
     fun findByPath(path: String): NavRouteDefinition? {
-        return definitionsByPath[path.normalizeRoutePath()]
+        return match(path)?.definition
     }
 
     fun contains(path: String): Boolean {
-        return findByPath(path) != null
-    }
-
-    private val NavRouteDefinition.normalizedPath: String
-        get() = path.normalizeRoutePath()
-
-    private fun String.normalizeRoutePath(): String {
-        return trim().trim('/')
+        return match(path) != null
     }
 }
+
+private fun NavRouteDefinition.acceptsQueryParameters(
+    queryParameters: Map<String, String>,
+): Boolean {
+    return queryDiscriminator?.matches(queryParameters) ?: true
+}
+
+private data class RegisteredNavRoute(
+    val definition: NavRouteDefinition,
+    val pattern: CompiledNavRoutePattern,
+)
+
+private data class CompiledNavRoutePattern(
+    val segments: List<NavRoutePatternSegment>,
+) {
+    val literalSegmentCount: Int =
+        segments.count { segment ->
+            segment is NavRoutePatternSegment.Literal
+        }
+
+    fun match(pathSegments: List<String>): Map<String, String>? {
+        if (segments.size != pathSegments.size) {
+            return null
+        }
+
+        val pathParameters = linkedMapOf<String, String>()
+
+        segments.forEachIndexed { index, patternSegment ->
+            val pathSegment = pathSegments[index]
+
+            when (patternSegment) {
+                is NavRoutePatternSegment.Literal -> {
+                    if (patternSegment.value != pathSegment) {
+                        return null
+                    }
+                }
+
+                is NavRoutePatternSegment.Parameter -> {
+                    pathParameters[patternSegment.name] = pathSegment
+                }
+            }
+        }
+
+        return pathParameters.toMap()
+    }
+
+    fun overlaps(other: CompiledNavRoutePattern): Boolean {
+        if (segments.size != other.segments.size) {
+            return false
+        }
+
+        return segments.zip(other.segments).all { (left, right) ->
+            left !is NavRoutePatternSegment.Literal ||
+                right !is NavRoutePatternSegment.Literal ||
+                left.value == right.value
+        }
+    }
+}
+
+private sealed interface NavRoutePatternSegment {
+    data class Literal(
+        val value: String,
+    ) : NavRoutePatternSegment
+
+    data class Parameter(
+        val name: String,
+    ) : NavRoutePatternSegment
+}
+
+private fun compileNavRoutePattern(path: String): CompiledNavRoutePattern {
+    val pathSegments =
+        requireNotNull(parseRoutePathSegments(path)) {
+            "Nav route pattern must contain non-empty path segments."
+        }
+    val patternSegments =
+        pathSegments.map { segment ->
+            val parameterMatch = RouteParameterPattern.matchEntire(segment)
+
+            when {
+                parameterMatch != null -> {
+                    NavRoutePatternSegment.Parameter(
+                        name = parameterMatch.groupValues[1],
+                    )
+                }
+
+                '{' in segment || '}' in segment -> {
+                    throw IllegalArgumentException(
+                        "Malformed nav route parameter segment: $segment",
+                    )
+                }
+
+                else -> NavRoutePatternSegment.Literal(segment)
+            }
+        }
+    val parameterNames =
+        patternSegments.mapNotNull { segment ->
+            (segment as? NavRoutePatternSegment.Parameter)?.name
+        }
+
+    require(parameterNames.distinct().size == parameterNames.size) {
+        "Nav route pattern contains duplicated parameter names: $path"
+    }
+
+    return CompiledNavRoutePattern(patternSegments)
+}
+
+private fun validateNoAmbiguousPatterns(routes: List<RegisteredNavRoute>) {
+    routes.forEachIndexed { leftIndex, left ->
+        routes
+            .drop(leftIndex + 1)
+            .forEach { right ->
+                val hasEqualSpecificity =
+                    left.pattern.literalSegmentCount ==
+                        right.pattern.literalSegmentCount
+                val overlaps = left.pattern.overlaps(right.pattern)
+
+                require(!hasEqualSpecificity || !overlaps) {
+                    "NavRouteTable contains ambiguous route patterns: " +
+                        "${left.definition.path} and ${right.definition.path}."
+                }
+            }
+    }
+}
+
+private fun parseRoutePathSegments(path: String): List<String>? {
+    val normalizedPath = path.trim().trim('/')
+    if (normalizedPath.isBlank()) {
+        return null
+    }
+
+    return normalizedPath
+        .split('/')
+        .takeIf { segments ->
+            segments.none(String::isBlank)
+        }
+}
+
+private val RouteParameterPattern =
+    Regex("""^\{([A-Za-z][A-Za-z0-9_]*)}$""")
 
 private val NavPresentation.defaultForwardMode: ForwardMode
     get() =

@@ -186,6 +186,7 @@ object NavOverlayRouteArguments {
     const val ACTIONS: String = "actions"
 
     internal val generatedParameterNames = setOf(TITLE, MESSAGE, ACTIONS)
+    internal val discriminatorParameterNames = generatedParameterNames + ID
 }
 
 fun navOverlayRoutePattern(presentation: NavPresentation): String {
@@ -225,6 +226,11 @@ fun navOverlayRouteDefinition(
     return NavRouteDefinition(
         id = NavRouteId(presentation.overlayPath),
         path = presentation.overlayPath,
+        queryDiscriminator =
+            NavRouteQueryDiscriminator(
+                parameterNames =
+                    NavOverlayRouteArguments.discriminatorParameterNames,
+            ),
         requiresAuth = requiresAuth,
         presentation = presentation,
     )

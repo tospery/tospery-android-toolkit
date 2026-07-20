@@ -35,6 +35,7 @@ enum class OpenMode {
 sealed interface NavAction {
     data class Forward(
         val route: NavRoute,
+        val pathParameters: Map<String, String> = emptyMap(),
         val mode: ForwardMode = ForwardMode.PUSH,
         val presentation: NavPresentation = NavPresentation.SCREEN,
     ) : NavAction
