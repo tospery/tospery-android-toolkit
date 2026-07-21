@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +27,7 @@ private val SuiteListRowContentPadding =
 /**
  * 面向设置、资料等列表场景的无业务通用行。
  *
+ * [supportingText] 用于标题下方的辅助说明；
  * [trailingText] 适合“标题 + 可省略的右侧值 + 箭头”等常见资料行；
  * [trailingContent] 则用于图标、开关等自定义尾部内容。
  */
@@ -38,6 +40,9 @@ fun SuiteListRow(
     titleStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     titleTextAlign: TextAlign = TextAlign.Start,
+    supportingText: String? = null,
+    supportingTextStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    supportingTextColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     trailingText: String? = null,
     trailingTextStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     trailingTextColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -66,15 +71,32 @@ fun SuiteListRow(
                 content()
                 Spacer(modifier = Modifier.width(14.dp))
             }
-            Text(
-                text = title,
+            Column(
                 modifier = Modifier.weight(titleWeight),
-                color = titleColor,
-                style = titleStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = titleTextAlign,
-            )
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = titleColor,
+                    style = titleStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = titleTextAlign,
+                )
+
+                supportingText?.let { value ->
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = value,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = supportingTextColor,
+                        style = supportingTextStyle,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = titleTextAlign,
+                    )
+                }
+            }
             trailingText?.let { value ->
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
