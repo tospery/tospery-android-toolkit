@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,16 +20,21 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 private val SuiteListRowContentPadding =
     PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+private val SuiteListRowTrailingTextMinFontSize = 12.sp
+private val SuiteListRowTrailingTextStepSize = 1.sp
 
 /**
  * 面向设置、资料等列表场景的无业务通用行。
  *
  * [supportingText] 用于标题下方的辅助说明；
- * [trailingText] 适合“标题 + 可省略的右侧值 + 箭头”等常见资料行；
+ * [trailingText] 适合“标题 + 可省略的右侧值 + 箭头”等常见资料行，空间不足时会先自动缩小字号，
+ * 达到最小字号后仍无法完整显示才使用省略号；
  * [trailingContent] 则用于图标、开关等自定义尾部内容。
  */
 @Composable
@@ -103,6 +109,7 @@ fun SuiteListRow(
                     text = value,
                     modifier = Modifier.weight(1f),
                     color = trailingTextColor,
+                    autoSize = trailingTextStyle.suiteListRowTrailingTextAutoSize(),
                     style = trailingTextStyle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -123,4 +130,17 @@ fun SuiteListRow(
             )
         }
     }
+}
+
+private fun TextStyle.suiteListRowTrailingTextAutoSize(): TextAutoSize? {
+    val maxFontSize: TextUnit = fontSize
+    if (!maxFontSize.isSp || maxFontSize <= SuiteListRowTrailingTextMinFontSize) {
+        return null
+    }
+
+    return TextAutoSize.StepBased(
+        minFontSize = SuiteListRowTrailingTextMinFontSize,
+        maxFontSize = maxFontSize,
+        stepSize = SuiteListRowTrailingTextStepSize,
+    )
 }
