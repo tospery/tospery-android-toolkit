@@ -1,8 +1,11 @@
 package com.tospery.net.retrofit
 
 import com.tospery.base.logging.LogTags
+import com.tospery.base.logging.LogLevel
+import com.tospery.base.logging.debug
 import com.tospery.base.logging.error
 import com.tospery.base.logging.info
+import com.tospery.base.logging.isLoggable
 import com.tospery.base.logging.warning
 import com.tospery.buildmetadata.module_net_retrofit.ModuleMetadata
 import java.io.IOException
@@ -29,22 +32,23 @@ internal class AppLoggerInterceptor(
         val request = chain.request()
         val url = request.url.toLogUrl()
 
-        info(tag = tag) { "[${request.method}]$url" }
-        request.body.requestBodyForLog(request.headers)?.let { requestBody ->
-            info(tag = tag) { requestBody }
+        debug(tag = tag) { "[${request.method}]$url" }
+        if (isLoggable(LogLevel.DEBUG, tag)) {
+            request.body.requestBodyForLog(request.headers)?.let { requestBody ->
+                debug(tag = tag) { requestBody }
+            }
         }
 
         return try {
             val response = chain.proceed(request)
-            val responseBody = response.responseBodyForLog()
 
             if (response.isSuccessful) {
-                info(tag = tag) { "[${response.code}]$url" }
-                info(tag = tag) { responseBody }
+                info(tag = tag) { "[${request.method}][${response.code}]$url" }
             } else {
-                warning(tag = tag) { "[${response.code}]$url" }
-                warning(tag = tag) { responseBody }
+                warning(tag = tag) { "[${request.method}][${response.code}]$url" }
             }
+            // 正文可能包含用户资料等业务数据，仅在 Debug 可记录，且继续执行字段脱敏。
+            debug(tag = tag) { response.responseBodyForLog() }
 
             response
         } catch (throwable: IOException) {
@@ -53,7 +57,9 @@ internal class AppLoggerInterceptor(
                 throwable = throwable,
             ) {
                 buildString {
-                    append("[异常]")
+                    append("[")
+                    append(request.method)
+                    append("][异常]")
                     append(url)
                     append(" ")
                     append(throwable.javaClass.simpleName)

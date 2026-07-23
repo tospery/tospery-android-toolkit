@@ -42,7 +42,8 @@ object RetrofitNetworkFactory {
     }
 
     private fun isNetworkLoggable(): Boolean {
-        return isLoggable(LogLevel.INFO, NET_LOG_TAG) ||
+        return isLoggable(LogLevel.DEBUG, NET_LOG_TAG) ||
+            isLoggable(LogLevel.INFO, NET_LOG_TAG) ||
             isLoggable(LogLevel.WARNING, NET_LOG_TAG) ||
             isLoggable(LogLevel.ERROR, NET_LOG_TAG)
     }

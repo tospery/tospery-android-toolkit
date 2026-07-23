@@ -2,6 +2,7 @@ package com.tospery.net.retrofit
 
 import com.squareup.moshi.JsonClass
 import com.tospery.base.logging.LogEntry
+import com.tospery.base.logging.LogLevel
 import com.tospery.base.logging.LogProvider
 import com.tospery.base.logging.LogRegistry
 import com.tospery.base.logging.NoOpLogProvider
@@ -133,8 +134,12 @@ class RetrofitNetworkFactoryTest {
             val messages = logger.entries.map { it.message }
             assertEquals(3, messages.size)
             assertEquals("[GET]${server.url("/repos")}", messages[0])
-            assertEquals("[200]${server.url("/repos")}", messages[1])
+            assertEquals("[GET][200]${server.url("/repos")}", messages[1])
             assertEquals("ok", messages[2])
+            assertEquals(
+                listOf(LogLevel.DEBUG, LogLevel.INFO, LogLevel.DEBUG),
+                logger.entries.map(LogEntry::level),
+            )
             assertTrue(messages.contains("<空>").not())
             assertTrue(messages.joinToString("\n").contains("secret").not())
             assertTrue(logger.entries.all { it.tag == NET_LOG_TAG })
@@ -177,7 +182,7 @@ class RetrofitNetworkFactoryTest {
             assertEquals("[POST]${server.url("/v1/github/login")}", messages[0])
             assertTrue(messages[1].contains(""""githubAccessToken":"***""""))
             assertTrue(messages[1].contains(""""client":{"platform":"android"}"""))
-            assertEquals("[200]${server.url("/v1/github/login")}", messages[2])
+            assertEquals("[POST][200]${server.url("/v1/github/login")}", messages[2])
             assertTrue(messages[3].contains(""""access_token":"***""""))
             assertTrue(messages[3].contains(""""user":{"login":"tospery"}"""))
             assertTrue(messages.joinToString("\n").contains("client-secret").not())
@@ -224,10 +229,46 @@ class RetrofitNetworkFactoryTest {
             )
             assertTrue(messages[1].contains(""""githubAccessToken":"client-secret""""))
             assertEquals(
-                "[200]${server.url("/v1/github/login?access_token=query-secret")}",
+                "[POST][200]${server.url("/v1/github/login?access_token=query-secret")}",
                 messages[2],
             )
             assertTrue(messages[3].contains(""""access_token":"server-secret""""))
+        }
+    }
+
+    @Test
+    fun infoMinimumLevelDoesNotLogRequestOrResponseBodies() {
+        MockWebServer().use { server ->
+            server.enqueue(
+                MockResponse(
+                    code = 200,
+                    body = """{"user":{"email":"private@example.com"}}""",
+                    headers = okhttp3.Headers.headersOf("Content-Type", "application/json"),
+                ),
+            )
+            server.start()
+
+            val logger = RecordingLogProvider(minimumLevel = LogLevel.INFO)
+            LogRegistry.install(logger)
+            val client =
+                RetrofitNetworkFactory.createOkHttpClient(
+                    config = RetrofitNetworkConfig(baseUrl = server.url("/").toString()),
+                )
+
+            client
+                .newCall(
+                    Request
+                        .Builder()
+                        .url(server.url("/user"))
+                        .build(),
+                ).execute()
+                .close()
+
+            assertEquals(
+                listOf("[GET][200]${server.url("/user")}"),
+                logger.entries.map(LogEntry::message),
+            )
+            assertTrue(logger.entries.all { it.level == LogLevel.INFO })
         }
     }
 
@@ -272,8 +313,15 @@ class RetrofitNetworkFactoryTest {
         }
     }
 
-    private class RecordingLogProvider : LogProvider {
+    private class RecordingLogProvider(
+        private val minimumLevel: LogLevel = LogLevel.VERBOSE,
+    ) : LogProvider {
         val entries = mutableListOf<LogEntry>()
+
+        override fun isLoggable(
+            level: LogLevel,
+            tag: String?,
+        ): Boolean = level.ordinal >= minimumLevel.ordinal
 
         override fun log(entry: LogEntry) {
             entries += entry
