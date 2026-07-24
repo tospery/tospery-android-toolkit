@@ -20,11 +20,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+/**
+ * App 级阻塞式 HUD。
+ *
+ * [showContentContainer] 为 false 时，加载内容直接绘制在 scrim 上，不创建 Surface、圆角或阴影。
+ */
 @Composable
 fun AppHud(
     visible: Boolean,
     modifier: Modifier = Modifier,
     message: String? = null,
+    showContentContainer: Boolean = true,
 ) {
     if (!visible) return
 
@@ -34,30 +40,48 @@ fun AppHud(
             .background(Color.Black.copy(alpha = 0.24f)),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(min = 112.dp, max = 220.dp)
-                .clip(RoundedCornerShape(16.dp)),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+        if (showContentContainer) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(min = 112.dp, max = 220.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(36.dp),
+                AppHudContent(
+                    message = message,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
                 )
-                if (!message.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.size(14.dp))
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
             }
+        } else {
+            AppHudContent(
+                message = message,
+                modifier = Modifier.widthIn(max = 220.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppHudContent(
+    message: String?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(36.dp),
+        )
+        if (!message.isNullOrBlank()) {
+            Spacer(modifier = Modifier.size(14.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }
