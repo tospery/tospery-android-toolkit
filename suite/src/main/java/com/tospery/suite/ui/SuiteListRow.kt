@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private val SuiteListRowContentPadding =
-    PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+    PaddingValues(horizontal = 20.dp, vertical = 8.dp)
 private val SuiteListRowTrailingTextMinFontSize = 12.sp
 private val SuiteListRowTrailingTextStepSize = 1.sp
 
@@ -46,6 +46,7 @@ fun SuiteListRow(
     titleStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     titleTextAlign: TextAlign = TextAlign.Start,
+    titleWeight: Float? = null,
     supportingText: String? = null,
     supportingTextStyle: TextStyle = MaterialTheme.typography.bodyMedium,
     supportingTextColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -63,7 +64,7 @@ fun SuiteListRow(
         } else {
             modifier.clickable(onClick = onClick)
         }
-    val titleWeight = if (trailingText == null) 1f else 0.4f
+    val computedTitleWeight = titleWeight ?: (if (trailingText == null) 1f else 0.4f)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -78,7 +79,7 @@ fun SuiteListRow(
                 Spacer(modifier = Modifier.width(14.dp))
             }
             Column(
-                modifier = Modifier.weight(titleWeight),
+                modifier = Modifier.weight(computedTitleWeight),
             ) {
                 Text(
                     text = title,
